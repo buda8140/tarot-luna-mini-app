@@ -1,0 +1,268 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Mystical Dark Theme - Primary Palette */
+    --background: 270 50% 5%;
+    --foreground: 45 30% 95%;
+
+    --card: 270 45% 8%;
+    --card-foreground: 45 30% 95%;
+
+    --popover: 270 45% 10%;
+    --popover-foreground: 45 30% 95%;
+
+    /* Deep purple primary */
+    --primary: 270 60% 50%;
+    --primary-foreground: 45 30% 98%;
+
+    /* Gold accent */
+    --secondary: 45 80% 50%;
+    --secondary-foreground: 270 50% 10%;
+
+    /* Muted mystical */
+    --muted: 270 30% 15%;
+    --muted-foreground: 270 20% 60%;
+
+    /* Purple glow accent */
+    --accent: 280 70% 45%;
+    --accent-foreground: 45 30% 98%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 45 30% 98%;
+
+    --border: 270 30% 20%;
+    --input: 270 30% 15%;
+    --ring: 280 70% 50%;
+
+    --radius: 0.75rem;
+
+    /* Custom mystical colors */
+    --mystic-deep: 270 50% 5%;
+    --mystic-purple: 270 60% 15%;
+    --mystic-violet: 280 70% 40%;
+    --mystic-gold: 45 90% 55%;
+    --mystic-gold-dim: 45 70% 35%;
+    --mystic-silver: 220 20% 75%;
+    --mystic-glow: 280 100% 60%;
+    --star-color: 45 100% 90%;
+
+    /* Gradients */
+    --gradient-mystic: linear-gradient(180deg, hsl(270 50% 5%) 0%, hsl(270 60% 12%) 50%, hsl(280 50% 8%) 100%);
+    --gradient-card: linear-gradient(145deg, hsl(270 45% 12%) 0%, hsl(270 50% 8%) 100%);
+    --gradient-gold: linear-gradient(135deg, hsl(45 90% 55%) 0%, hsl(35 85% 45%) 100%);
+    --gradient-button: linear-gradient(135deg, hsl(270 60% 45%) 0%, hsl(280 70% 50%) 100%);
+
+    /* Shadows */
+    --shadow-glow: 0 0 30px hsl(280 70% 50% / 0.4);
+    --shadow-gold: 0 0 20px hsl(45 90% 55% / 0.3);
+    --shadow-card: 0 8px 32px hsl(270 50% 5% / 0.6);
+
+    --sidebar-background: 270 50% 7%;
+    --sidebar-foreground: 45 30% 90%;
+    --sidebar-primary: 270 60% 50%;
+    --sidebar-primary-foreground: 45 30% 98%;
+    --sidebar-accent: 280 70% 45%;
+    --sidebar-accent-foreground: 45 30% 98%;
+    --sidebar-border: 270 30% 18%;
+    --sidebar-ring: 280 70% 50%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', sans-serif;
+    background: var(--gradient-mystic);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  h1, h2, h3, h4, h5, h6, .font-serif {
+    font-family: 'Cinzel', serif;
+  }
+}
+
+@layer components {
+  .mystic-card {
+    @apply relative overflow-hidden rounded-xl border border-border/50;
+    background: var(--gradient-card);
+    box-shadow: var(--shadow-card);
+  }
+
+  .mystic-button {
+    @apply relative overflow-hidden rounded-lg px-6 py-3 font-medium transition-all duration-300;
+    background: var(--gradient-button);
+    box-shadow: var(--shadow-glow);
+  }
+
+  .mystic-button:hover {
+    transform: scale(1.02);
+    box-shadow: 0 0 40px hsl(280 70% 50% / 0.6);
+  }
+
+  .gold-text {
+    background: var(--gradient-gold);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glow-text {
+    text-shadow: 0 0 20px hsl(var(--mystic-glow) / 0.6),
+                 0 0 40px hsl(var(--mystic-glow) / 0.3);
+  }
+
+  .card-flip {
+    perspective: 1000px;
+  }
+
+  .card-flip-inner {
+    transition: transform 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-style: preserve-3d;
+  }
+
+  .card-flip-inner.flipped {
+    transform: rotateY(180deg);
+  }
+
+  .card-front, .card-back {
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  .card-back {
+    transform: rotateY(180deg);
+  }
+
+  .star {
+    @apply absolute rounded-full;
+    background: hsl(var(--star-color));
+    animation: twinkle 3s ease-in-out infinite;
+  }
+
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.3; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.2); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-10px) rotate(2deg); }
+  }
+
+  @keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 20px hsl(280 70% 50% / 0.4); }
+    50% { box-shadow: 0 0 40px hsl(280 70% 50% / 0.7); }
+  }
+
+  @keyframes pulse-gold-glow {
+    0%, 100% { 
+      box-shadow: 0 0 20px hsl(45 90% 55% / 0.4), 0 0 40px hsl(45 90% 55% / 0.2);
+    }
+    50% { 
+      box-shadow: 0 0 40px hsl(45 90% 55% / 0.7), 0 0 60px hsl(45 90% 55% / 0.4);
+    }
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+
+  @keyframes card-flip-glow {
+    0% { 
+      filter: brightness(1) drop-shadow(0 0 10px hsl(45 90% 55% / 0.3));
+    }
+    50% { 
+      filter: brightness(1.2) drop-shadow(0 0 30px hsl(45 90% 55% / 0.8));
+    }
+    100% { 
+      filter: brightness(1) drop-shadow(0 0 15px hsl(45 90% 55% / 0.4));
+    }
+  }
+
+  @keyframes magical-sparkle {
+    0%, 100% { 
+      opacity: 0.3;
+      transform: scale(0.8) rotate(0deg);
+    }
+    50% { 
+      opacity: 1;
+      transform: scale(1.2) rotate(180deg);
+    }
+  }
+
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-pulse-glow {
+    animation: pulse-glow 3s ease-in-out infinite;
+  }
+
+  .animate-pulse-gold-glow {
+    animation: pulse-gold-glow 2s ease-in-out infinite;
+  }
+
+  .animate-card-flip-glow {
+    animation: card-flip-glow 1s ease-out forwards;
+  }
+
+  .animate-magical-sparkle {
+    animation: magical-sparkle 1.5s ease-in-out infinite;
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      hsl(45 90% 70% / 0.2) 50%,
+      transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2s linear infinite;
+  }
+
+  .premium-border {
+    @apply relative;
+  }
+
+  .premium-border::before {
+    content: '';
+    @apply absolute inset-0 rounded-xl;
+    padding: 2px;
+    background: var(--gradient-gold);
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+  }
+
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
