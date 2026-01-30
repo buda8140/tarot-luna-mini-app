@@ -301,18 +301,34 @@ export async function getHistory(
     pagination: { total: number };
   }>(`/api/history?user_id=${telegramUser.id}&page=${page}&limit=${limit}`);
 
-  console.log('[API] getHistory result:', result);
+  // Подробное логирование для отладки
+  console.log('[API] getHistory raw result:', JSON.stringify(result, null, 2));
 
   if (!result.success) {
     console.error('[API] getHistory error:', result.error);
     return { history: [], payments: [], total: 0, error: result.error };
   }
 
-  return {
-    history: result.data?.history || [],
-    payments: result.data?.payments || [],
-    total: result.data?.pagination?.total || 0,
-  };
+  // Безопасная валидация данных с защитой от некорректных ответов
+  try {
+    const rawHistory = result.data?.history;
+    const rawPayments = result.data?.payments;
+    
+    // Проверяем что данные - массивы
+    const history = Array.isArray(rawHistory) ? rawHistory.filter(item => item && typeof item === 'object') : [];
+    const payments = Array.isArray(rawPayments) ? rawPayments.filter(item => item && typeof item === 'object') : [];
+    
+    console.log('[API] getHistory parsed:', { historyCount: history.length, paymentsCount: payments.length });
+    
+    return {
+      history,
+      payments,
+      total: result.data?.pagination?.total || history.length,
+    };
+  } catch (parseError) {
+    console.error('[API] getHistory parse error:', parseError);
+    return { history: [], payments: [], total: 0, error: 'Ошибка обработки данных истории' };
+  }
 }
 
 // Получить достижения из БД
