@@ -1661,7 +1661,6 @@ class Database:
                         p.status,
                         p.timestamp,
                         p.yoomoney_label,
-                        p.admin_id,
                         COALESCE(r.label, '') as tariff_name
                     FROM payments p
                     LEFT JOIN rates r ON p.requests = r.requests 

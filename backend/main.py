@@ -577,7 +577,7 @@ async def check_yoomoney_payments() -> None:
                 continue
 
             logger.info(f"💰 Confirming payment {pending_id} and crediting {pending_requests} requests to user {pending_user_id}...")
-            success = await db.confirm_payment(payment_id=pending_id, status="confirmed")
+            success = await db.confirm_payment(payment_id=pending_id, status="confirmed", requests=pending_requests)
 
             if success:
                 # Пишем в платеж operation_id/amount_received, если в таблице есть колонки

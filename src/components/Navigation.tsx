@@ -32,7 +32,7 @@ export const Navigation = () => {
                 key={item.path}
                 to={item.path}
                 onClick={() => haptic.selection()}
-                className="relative flex flex-col items-center gap-1 px-4 py-1"
+                className="relative flex flex-col items-center gap-0.5 px-2 py-1 min-w-0"
               >
                 {isActive && (
                   <motion.div
@@ -49,7 +49,7 @@ export const Navigation = () => {
                 />
                 <span
                   className={cn(
-                    'text-[10px] font-medium transition-colors duration-200',
+                    'text-[9px] font-medium transition-colors duration-200 truncate max-w-[50px] text-center',
                     isActive ? 'text-foreground' : 'text-muted-foreground'
                   )}
                 >
