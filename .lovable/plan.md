@@ -1,185 +1,151 @@
 
-# Полный план обновления и деплоя Tarot Luna Mini App
+# План исправления: Tarot Luna Mini App
 
-## Результаты сравнения TARO CHAT и backend
+## Выявленные проблемы
 
-### Что было проверено:
+### 1. Меню навигации обрезается (скриншоты 2 и 3)
+На скриншотах видно, что слово "История" обрезается. Хотя код в репозитории содержит исправления (`px-2`, `text-[9px]`, `truncate`), они либо не применились, либо недостаточны.
 
-| Файл | TARO CHAT | backend | Статус |
-|------|-----------|---------|--------|
-| `database.py` - `get_user_payments()` | Включает `p.admin_id` | **УЖЕ исправлен** - без `admin_id` | ✅ OK |
-| `main.py` - `confirm_payment()` | Без `requests` параметра | **УЖЕ исправлен** - с `requests=pending_requests` | ✅ OK |
-| `Navigation.tsx` | - | Исправлен: `px-2`, `text-[9px]`, `truncate` | ✅ OK |
-| `History.tsx` | - | Добавлены try-catch, фильтрация | ✅ OK |
-| `api.ts` | - | Улучшена валидация | ✅ OK |
-
-### Вывод: Все критические исправления УЖЕ внесены в backend!
-
-Единственное что может отсутствовать:
-- **Тестовый тариф test_5 в БД** (нужно добавить вручную если база уже существует)
-
----
-
-## Нужные изменения
-
-### 1. Создать файл DEPLOY.md с полной инструкцией
-
-Новый файл `DEPLOY.md` в корне проекта со всеми шагами по деплою.
-
----
-
-## Содержимое файла DEPLOY.md
-
-```text
-# Полная инструкция по деплою Tarot Luna Mini App
-
-## Оглавление
-1. [Требования](#требования)
-2. [Первоначальная настройка VPS](#первоначальная-настройка-vps)
-3. [Загрузка файлов через MobaXterm](#загрузка-файлов-через-mobaxterm)
-4. [Настройка Python бэкенда](#настройка-python-бэкенда)
-5. [Сборка фронтенда](#сборка-фронтенда)
-6. [Настройка Nginx](#настройка-nginx)
-7. [FreeDNS и домен](#freedns-и-домен)
-8. [SSL сертификат (бесплатно)](#ssl-сертификат-бесплатно)
-9. [PM2 - автозапуск 24/7](#pm2---автозапуск-247)
-10. [Тестовый тариф](#тестовый-тариф)
-11. [Проверка работоспособности](#проверка-работоспособности)
-12. [Устранение проблем](#устранение-проблем)
-13. [Обновление после изменений](#обновление-после-изменений)
-
----
-
-## Требования
-
-- VPS с Ubuntu 22.04/24.04 (минимум 1GB RAM)
-- Root доступ по SSH
-- Зарегистрированный домен на freedns.afraid.org (tarotluna.mooo.com)
-- IP вашего VPS
-
----
-
-## Первоначальная настройка VPS
-
-### 1. Подключиться к серверу
-
-Через MobaXterm:
-1. Нажмите "Session" → "SSH"
-2. Remote host: ваш IP (например: 185.105.91.173)
-3. Username: root
-4. Нажмите OK
-5. Введите пароль
-
-### 2. Обновить систему
-
-```bash
-apt update && apt upgrade -y
+**Текущий код Navigation.tsx (строка 35, 51-54):**
+```tsx
+className="relative flex flex-col items-center gap-0.5 px-2 py-1 min-w-0"
+// ...
+className="text-[9px] font-medium transition-colors duration-200 truncate max-w-[50px] text-center"
 ```
 
-### 3. Установить необходимые пакеты
+**Проблема:** `max-w-[50px]` слишком узкий для слова "История" (8 букв). Также контейнер использует `justify-around`, что может не равномерно распределять элементы.
+
+### 2. Белый экран при переходе в Историю (скриншот 1)
+Скриншот показывает почти пустой темный экран. Логи показывают HTTP 200 для `/api/history` с данными (19372 байта), значит API работает. Проблема во фронтенде.
+
+**Возможные причины:**
+- Ошибка парсинга данных в `History.tsx`
+- Несоответствие структуры данных между API и ожидаемой схемой
+
+### 3. Код на VPS не обновлён
+Логи с VPS показывают что бэкенд работает, но пользователь явно использует старую версию. Необходимо пересобрать и передеплоить.
+
+---
+
+## Технические исправления
+
+### Файл 1: `src/components/Navigation.tsx`
+
+**Проблема:** Элементы меню распределяются неравномерно и текст обрезается.
+
+**Решение:** 
+- Убрать `max-w-[50px]` (слишком узко)
+- Использовать `flex-1` для равномерного распределения
+- Добавить `text-nowrap` чтобы текст не переносился
+- Уменьшить иконки с `w-5 h-5` до `w-4 h-4`
+
+```tsx
+// NavLink className (строка 35):
+className="relative flex flex-col items-center justify-center gap-0.5 px-1 py-1 flex-1 min-w-0"
+
+// Icon className (строка 44-47):
+className="w-4 h-4 transition-colors duration-200"
+
+// Span className (строка 50-54):
+className="text-[8px] font-medium transition-colors text-nowrap"
+```
+
+### Файл 2: `src/pages/History.tsx`
+
+**Проблема:** Возможный краш при рендеринге некорректных данных.
+
+**Решение:** Добавить дополнительную защиту от null/undefined в рендеринге:
+
+```tsx
+// Строка 197-239 - обернуть весь map в дополнительный try-catch:
+{readings.length === 0 ? (
+  // пустое состояние
+) : (
+  <>
+    {readings.map((reading, index) => {
+      if (!reading || !reading.id) return null;
+      // ... остальной код
+    }).filter(Boolean)}
+  </>
+)}
+```
+
+### Файл 3: Без изменений в backend
+
+Backend файлы (`database.py`, `main.py`) уже содержат все необходимые исправления:
+- `get_user_payments()` - без `admin_id` (строка 1655-1671) 
+- `confirm_payment()` - с `requests=pending_requests` (строка 580)
+- `yoomoney_label` колонка добавляется автоматически при инициализации БД
+
+---
+
+## Полная инструкция деплоя на VPS
+
+### Шаг 1: Подключение через MobaXterm
+
+1. Откройте MobaXterm
+2. Нажмите **Session** → **SSH**
+3. Введите:
+   - Remote host: `IP вашего VPS`
+   - Username: `root`
+4. Нажмите **OK** и введите пароль
+
+### Шаг 2: Первоначальная настройка (только один раз)
 
 ```bash
-# Python и зависимости
-apt install -y python3 python3-pip python3-venv
+# Обновить систему
+apt update && apt upgrade -y
 
-# Node.js 20.x
+# Установить Node.js 20
 curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
 apt install -y nodejs
 
-# Nginx
-apt install -y nginx
-
-# Certbot для SSL
-apt install -y certbot python3-certbot-nginx
-
-# PM2 для автозапуска
+# Установить Python, Nginx, PM2, Git, SQLite
+apt install -y python3 python3-pip python3-venv nginx git sqlite3
 npm install -g pm2
 
-# Git
-apt install -y git
+# Установить Certbot для SSL
+apt install -y certbot python3-certbot-nginx
 
-# SQLite (для отладки)
-apt install -y sqlite3
-```
-
-### 4. Создать рабочую папку
-
-```bash
+# Создать папку проекта
 mkdir -p /root/tarot-luna
 cd /root/tarot-luna
 ```
 
----
+### Шаг 3: Загрузка файлов
 
-## Загрузка файлов через MobaXterm
-
-### Способ A: Через Git (рекомендуется)
-
+**Способ A: Через Git (рекомендуется)**
 ```bash
 cd /root
-git clone https://github.com/ваш-username/tarot-luna.git
+git clone https://github.com/YOUR_USERNAME/tarot-luna.git
 cd tarot-luna
 ```
 
-### Способ B: Через SFTP в MobaXterm
+**Способ B: Через SFTP в MobaXterm**
+1. В левой панели MobaXterm найдите файловый менеджер
+2. Перейдите в `/root/tarot-luna`
+3. Перетащите папки `backend/`, `src/` и файлы `package.json`, `.env` на сервер
 
-1. В левой панели MobaXterm виден файловый менеджер SFTP
-2. Перейдите в /root/tarot-luna
-3. Перетащите файлы проекта с вашего компьютера на сервер:
-   - Вся папка `backend/` (Python бэкенд)
-   - Вся папка `src/` (React код)
-   - `package.json`, `package-lock.json`
-   - `vite.config.ts`, `tsconfig.json`
-   - `tailwind.config.ts`, `postcss.config.js`
-   - `.env` файл
-
-### Структура на сервере должна быть:
-
-```
-/root/tarot-luna/
-├── backend/
-│   ├── main.py
-│   ├── api.py
-│   ├── database.py
-│   ├── yoomoney.py
-│   ├── ohmygpt_api.py
-│   ├── handlers.py
-│   ├── config.py
-│   ├── .env
-│   └── requirements.txt
-├── src/
-│   └── ... (React код)
-├── package.json
-├── .env
-└── vite.config.ts
-```
-
----
-
-## Настройка Python бэкенда
-
-### 1. Создать виртуальное окружение
+### Шаг 4: Настройка Python бэкенда
 
 ```bash
 cd /root/tarot-luna/backend
+
+# Создать виртуальное окружение
 python3 -m venv venv
 source venv/bin/activate
-```
 
-### 2. Установить зависимости
-
-```bash
+# Установить зависимости
 pip install -r requirements.txt
-```
 
-### 3. Проверить .env файл
+# Создать папку для логов
+mkdir -p logs
 
-```bash
+# Проверить .env файл
 nano .env
 ```
 
-Убедитесь что есть все переменные:
-
+**.env должен содержать:**
 ```
 BOT_TOKEN=ваш_токен
 ADMIN_ID=ваш_telegram_id
@@ -191,208 +157,86 @@ API_PORT=8080
 WEBAPP_URL=https://tarotluna.mooo.com
 ```
 
-Сохранить: Ctrl+O, Enter, Ctrl+X
-
-### 4. Создать папки для БД и логов
-
-```bash
-mkdir -p logs
-```
-
-### 5. Проверить запуск бэкенда
-
-```bash
-python main.py
-```
-
-Должны появиться логи:
-```
-🔮 Logging setup completed
-💾 Database initialized
-🌐 API server started on http://0.0.0.0:8080
-🔮 Starting bot...
-```
-
-Нажмите Ctrl+C чтобы остановить (дальше запустим через PM2).
-
----
-
-## Сборка фронтенда
-
-### 1. Установить npm зависимости
+### Шаг 5: Сборка фронтенда
 
 ```bash
 cd /root/tarot-luna
+
+# Установить npm пакеты
 npm install
-```
 
-### 2. Создать .env для фронтенда
+# Создать .env для фронтенда
+echo "VITE_API_URL=https://tarotluna.mooo.com" > .env
 
-```bash
-nano .env
-```
-
-Содержимое:
-```
-VITE_API_URL=https://tarotluna.mooo.com
-```
-
-### 3. Собрать production build
-
-```bash
+# Собрать production build
 npm run build
 ```
 
-Создастся папка `dist/` с готовыми файлами.
+### Шаг 6: Настройка FreeDNS
 
----
+1. Откройте https://freedns.afraid.org/subdomain/
+2. Войдите в аккаунт
+3. Найдите `tarotluna.mooo.com`
+4. Нажмите **edit** и введите IP вашего VPS
+5. Сохраните
 
-## Настройка Nginx
-
-### 1. Удалить дефолтный конфиг
-
-```bash
-rm /etc/nginx/sites-enabled/default
-```
-
-### 2. Создать конфиг для tarotluna
+### Шаг 7: Настройка Nginx
 
 ```bash
+# Создать конфигурацию
 nano /etc/nginx/sites-available/tarotluna
 ```
 
-Содержимое:
-
+**Содержимое файла:**
 ```nginx
 server {
     listen 80;
     server_name tarotluna.mooo.com;
 
-    # Фронтенд (статические файлы)
     root /root/tarot-luna/dist;
     index index.html;
 
-    # Проксирование API запросов на Python бэкенд
     location /api/ {
         proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
         proxy_read_timeout 60s;
-        proxy_connect_timeout 60s;
     }
 
-    # YooMoney webhook
-    location /yoomoney-webhook {
-        proxy_pass http://127.0.0.1:8080;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-
-    # SPA роутинг - все остальные запросы на index.html
     location / {
         try_files $uri $uri/ /index.html;
-    }
-
-    # Кеширование статики
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
-        expires 30d;
-        add_header Cache-Control "public, no-transform";
     }
 }
 ```
 
-### 3. Активировать конфиг
-
 ```bash
-ln -s /etc/nginx/sites-available/tarotluna /etc/nginx/sites-enabled/
-```
+# Активировать конфиг
+ln -sf /etc/nginx/sites-available/tarotluna /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
 
-### 4. Проверить и перезапустить Nginx
-
-```bash
+# Проверить и перезапустить
 nginx -t
 systemctl restart nginx
 ```
 
----
-
-## FreeDNS и домен
-
-### 1. Зайти на FreeDNS
-
-Откройте: https://freedns.afraid.org/subdomain/
-
-### 2. Войти в аккаунт
-
-Если нет аккаунта - зарегистрируйтесь.
-
-### 3. Найти ваш домен tarotluna.mooo.com
-
-В списке "Subdomains" найдите `tarotluna.mooo.com`
-
-### 4. Изменить IP адрес
-
-Нажмите "edit" рядом с доменом и введите IP вашего VPS:
-```
-185.105.91.173  (ваш реальный IP)
-```
-
-### 5. Сохранить
-
-Нажмите "Save". DNS обновится в течение 5-15 минут.
-
-### 6. Проверить
-
-```bash
-ping tarotluna.mooo.com
-```
-
-Должен отвечать ваш IP.
-
----
-
-## SSL сертификат (бесплатно)
-
-### Получить сертификат Let's Encrypt
+### Шаг 8: SSL сертификат (бесплатно)
 
 ```bash
 certbot --nginx -d tarotluna.mooo.com
 ```
 
-Следуйте инструкциям:
-1. Введите email
-2. Согласитесь с условиями (Y)
-3. Выберите redirect HTTP→HTTPS (2)
+Следуйте инструкциям (email, согласие, выбор redirect).
 
-Сертификат обновляется автоматически!
-
-### Проверить автообновление
-
-```bash
-certbot renew --dry-run
-```
-
----
-
-## PM2 - автозапуск 24/7
-
-### 1. Создать ecosystem.config.cjs
+### Шаг 9: PM2 автозапуск
 
 ```bash
 cd /root/tarot-luna/backend
-nano ecosystem.config.cjs
-```
 
-Содержимое:
-
-```javascript
+# Создать ecosystem.config.cjs
+cat > ecosystem.config.cjs << 'EOF'
 module.exports = {
   apps: [{
     name: 'tarot-backend',
@@ -401,214 +245,65 @@ module.exports = {
     cwd: '/root/tarot-luna/backend',
     autorestart: true,
     watch: false,
-    max_restarts: 10,
-    restart_delay: 5000,
-    env: {
-      PYTHONUNBUFFERED: '1'
-    }
+    env: { PYTHONUNBUFFERED: '1' }
   }]
 };
-```
+EOF
 
-### 2. Запустить через PM2
-
-```bash
-cd /root/tarot-luna/backend
+# Запустить
 pm2 start ecosystem.config.cjs
-```
-
-### 3. Сохранить для автозапуска
-
-```bash
 pm2 save
 pm2 startup
 ```
 
-### 4. Проверить статус
-
-```bash
-pm2 status
-```
-
-Должно показать:
-```
-│ tarot-backend │ online │
-```
-
-### 5. Смотреть логи
-
-```bash
-pm2 logs tarot-backend --lines 50
-```
-
----
-
-## Тестовый тариф
-
-### Добавить тариф 2₽ в базу данных
+### Шаг 10: Добавить тестовый тариф
 
 ```bash
 cd /root/tarot-luna/backend
-sqlite3 database.db "INSERT OR REPLACE INTO rates (package_key, requests, price, label) VALUES ('test_5', 5, 2, '🧪 Тест: 5 запросов (2 руб.)');"
-```
-
-### Проверить тарифы
-
-```bash
-sqlite3 database.db "SELECT * FROM rates;"
+sqlite3 database.db "INSERT OR REPLACE INTO rates (package_key, requests, price, label) VALUES ('test_5', 5, 2, '🧪 Тест: 5 запросов');"
 ```
 
 ---
 
-## Проверка работоспособности
+## Быстрая команда для обновления
 
-### 1. Проверить API
-
-```bash
-curl https://tarotluna.mooo.com/api/health
-```
-
-Ответ:
-```json
-{"success": true, "status": "ok"}
-```
-
-### 2. Открыть в браузере
-
-https://tarotluna.mooo.com
-
-### 3. Проверить в Telegram
-
-Откройте Mini App через бота
-
----
-
-## Устранение проблем
-
-### 502 Bad Gateway
+Используйте эту команду каждый раз после коммита изменений:
 
 ```bash
-# Проверить что бэкенд запущен
-pm2 status
-
-# Перезапустить если нужно
-pm2 restart tarot-backend
-
-# Проверить логи
-pm2 logs tarot-backend --lines 100
-```
-
-### Белый экран в истории
-
-```bash
-# Проверить логи на ошибки SQL
-pm2 logs tarot-backend --lines 50 | grep -i error
-```
-
-### Оплата не зачисляется
-
-```bash
-# Проверить логи YooMoney
-tail -50 /root/tarot-luna/backend/logs/yoomoney.log
-
-# Проверить pending платежи
-cd /root/tarot-luna/backend
-sqlite3 database.db "SELECT * FROM payments WHERE status='pending' ORDER BY timestamp DESC LIMIT 10;"
-```
-
-### Nginx ошибки
-
-```bash
-# Логи Nginx
-tail -50 /var/log/nginx/error.log
-
-# Проверить конфиг
-nginx -t
+cd /root/tarot-luna && \
+git pull origin main && \
+npm run build && \
+pm2 restart tarot-backend && \
+systemctl restart nginx && \
+echo "✅ Деплой завершён!"
 ```
 
 ---
 
-## Обновление после изменений
+## Проверка после деплоя
 
-### Быстрая команда (одна строка)
+1. **API health:**
+   ```bash
+   curl https://tarotluna.mooo.com/api/health
+   ```
 
-```bash
-cd /root/tarot-luna && git pull origin main && npm run build && pm2 restart tarot-backend && systemctl restart nginx && echo "✅ Деплой завершён!"
-```
+2. **Логи бэкенда:**
+   ```bash
+   pm2 logs tarot-backend --lines 30
+   ```
 
-### Пошагово:
-
-```bash
-# 1. Перейти в папку
-cd /root/tarot-luna
-
-# 2. Получить новый код
-git pull origin main
-
-# 3. Пересобрать фронтенд
-npm run build
-
-# 4. Перезапустить бэкенд
-pm2 restart tarot-backend
-
-# 5. Перезапустить Nginx (если менялся конфиг)
-systemctl restart nginx
-```
+3. **Тарифы в БД:**
+   ```bash
+   sqlite3 /root/tarot-luna/backend/database.db "SELECT * FROM rates;"
+   ```
 
 ---
 
-## Полезные команды
+## Резюме изменений
 
-| Команда | Описание |
-|---------|----------|
-| `pm2 status` | Статус бэкенда |
-| `pm2 logs tarot-backend` | Логи бэкенда |
-| `pm2 restart tarot-backend` | Перезапуск |
-| `pm2 stop tarot-backend` | Остановка |
-| `systemctl status nginx` | Статус Nginx |
-| `certbot renew` | Обновить SSL |
-| `sqlite3 backend/database.db` | Открыть БД |
-
----
-
-## Контакты
-
-Поддержка: @katya_katerina_bu
-
-🌙 Удачного деплоя! ✨
-```
-
----
-
-## Сводка изменений
-
-| Файл | Действие |
-|------|----------|
-| `DEPLOY.md` | СОЗДАТЬ - Полная инструкция по деплою |
-| `backend/database.py` | УЖЕ ИСПРАВЛЕН - нет изменений |
-| `backend/main.py` | УЖЕ ИСПРАВЛЕН - нет изменений |
-| `src/components/Navigation.tsx` | УЖЕ ИСПРАВЛЕН - нет изменений |
-| `src/pages/History.tsx` | УЖЕ ИСПРАВЛЕН - нет изменений |
-| `src/lib/api.ts` | УЖЕ ИСПРАВЛЕН - нет изменений |
-
----
-
-## После деплоя выполнить на VPS
-
-Одна команда для полного обновления:
-
-```bash
-cd /root/tarot-luna && git pull origin main && npm run build && cd backend && sqlite3 database.db "INSERT OR REPLACE INTO rates (package_key, requests, price, label) VALUES ('test_5', 5, 2, '🧪 Тест: 5 запросов (2 руб.)');" && cd .. && pm2 restart tarot-backend && systemctl restart nginx && echo "✅ Готово!"
-```
-
----
-
-## Контрольный список проверки
-
-После деплоя проверить:
-
-1. ✅ Меню навигации — все 5 пунктов видны на мобильном
-2. ✅ API health — `curl https://tarotluna.mooo.com/api/health` возвращает success
-3. ✅ Магазин — виден тестовый тариф 2₽
-4. ✅ Расклад — работает, история обновляется
-5. ✅ Оплата — тестовый платёж 2₽ зачисляется автоматически
+| Файл | Изменение |
+|------|-----------|
+| `src/components/Navigation.tsx` | Уменьшить иконки, убрать `max-w`, добавить `flex-1` |
+| `src/pages/History.tsx` | Усилить защиту от null при рендеринге |
+| `DEPLOY.md` | Уже создан - полная инструкция |
+| `backend/*` | Без изменений (уже исправлены) |
