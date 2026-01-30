@@ -42,18 +42,40 @@ const History = () => {
     try {
       console.log('[History] Loading history...');
       const data = await getHistory(0, 50);
-      console.log('[History] Received data:', data);
+      console.log('[History] Received data:', JSON.stringify(data, null, 2));
       
       if (data.error) {
         console.error('[History] Error:', data.error);
       }
       
-      setReadings(data.history || []);
-      setPayments(data.payments || []);
+      // Безопасное присвоение с валидацией каждого элемента
+      const validReadings = (data.history || []).filter(r => {
+        try {
+          return r && typeof r === 'object' && r.id !== undefined;
+        } catch {
+          console.error('[History] Invalid reading item:', r);
+          return false;
+        }
+      });
       
-      console.log('[History] Readings:', data.history?.length || 0, 'Payments:', data.payments?.length || 0);
+      const validPayments = (data.payments || []).filter(p => {
+        try {
+          return p && typeof p === 'object' && p.id !== undefined;
+        } catch {
+          console.error('[History] Invalid payment item:', p);
+          return false;
+        }
+      });
+      
+      setReadings(validReadings);
+      setPayments(validPayments);
+      
+      console.log('[History] Valid Readings:', validReadings.length, 'Valid Payments:', validPayments.length);
     } catch (error) {
-      console.error('[History] Error loading:', error);
+      console.error('[History] Critical error loading:', error);
+      // Устанавливаем пустые массивы вместо краша
+      setReadings([]);
+      setPayments([]);
     } finally {
       setIsLoading(false);
     }
@@ -172,40 +194,48 @@ const History = () => {
                 </button>
               </div>
             ) : (
-              readings.map((reading, index) => (
-                <motion.div
-                  key={reading.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.03 }}
-                  className="mystic-card overflow-hidden"
-                >
-                  <button
-                    onClick={() => setSelectedReading(reading)}
-                    className="w-full p-3 text-left"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex items-start gap-2 flex-1 min-w-0">
-                        <span className="text-xl flex-shrink-0">{getReadingTypeEmoji(reading.reading_type)}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
-                            <span className="font-medium text-xs">№{readings.length - index}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary">
-                              {getReadingTypeName(reading.reading_type)}
-                            </span>
+              readings.map((reading, index) => {
+                // Защита от ошибок рендеринга отдельных элементов
+                try {
+                  return (
+                    <motion.div
+                      key={reading.id || `reading-${index}`}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      className="mystic-card overflow-hidden"
+                    >
+                      <button
+                        onClick={() => setSelectedReading(reading)}
+                        className="w-full p-3 text-left"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-start gap-2 flex-1 min-w-0">
+                            <span className="text-xl flex-shrink-0">{getReadingTypeEmoji(reading.reading_type || '')}</span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                                <span className="font-medium text-xs">№{readings.length - index}</span>
+                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/20 text-primary">
+                                  {getReadingTypeName(reading.reading_type || '')}
+                                </span>
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">{reading.question || 'Без вопроса'}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground">
+                                <Calendar className="w-2.5 h-2.5" />
+                                {safeFormatDate(reading.timestamp || reading.created_at, 'd MMM, HH:mm')}
+                              </div>
+                            </div>
                           </div>
-                          <p className="text-xs text-muted-foreground truncate">{reading.question}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground">
-                            <Calendar className="w-2.5 h-2.5" />
-                            {safeFormatDate(reading.timestamp || reading.created_at, 'd MMM, HH:mm')}
-                          </div>
+                          <Eye className="w-4 h-4 text-primary flex-shrink-0" />
                         </div>
-                      </div>
-                      <Eye className="w-4 h-4 text-primary flex-shrink-0" />
-                    </div>
-                  </button>
-                </motion.div>
-              ))
+                      </button>
+                    </motion.div>
+                  );
+                } catch (err) {
+                  console.error('[History] Error rendering reading:', err, reading);
+                  return null;
+                }
+              }).filter(Boolean)
             )}
           </TabsContent>
 
@@ -227,31 +257,39 @@ const History = () => {
                 <p className="text-sm text-muted-foreground">История покупок пуста</p>
               </div>
             ) : (
-              payments.map((payment, index) => (
-                <motion.div
-                  key={payment.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.03 }}
-                  className="mystic-card p-3"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        {getStatusIcon(payment.status)}
-                        <span className="text-xs font-medium">{payment.requests} запросов</span>
+              payments.map((payment, index) => {
+                // Защита от ошибок рендеринга отдельных элементов
+                try {
+                  return (
+                    <motion.div
+                      key={payment.id || `payment-${index}`}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.03 }}
+                      className="mystic-card p-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            {getStatusIcon(payment.status || 'pending')}
+                            <span className="text-xs font-medium">{payment.requests || 0} запросов</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                            <span>{payment.amount || 0} ₽</span>
+                            <span>•</span>
+                            <span>{getStatusText(payment.status || 'pending')}</span>
+                            <span>•</span>
+                            <span>{safeFormatDate(payment.timestamp, 'd MMM')}</span>
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-                        <span>{payment.amount} ₽</span>
-                        <span>•</span>
-                        <span>{getStatusText(payment.status)}</span>
-                        <span>•</span>
-                        <span>{safeFormatDate(payment.timestamp, 'd MMM')}</span>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))
+                    </motion.div>
+                  );
+                } catch (err) {
+                  console.error('[History] Error rendering payment:', err, payment);
+                  return null;
+                }
+              }).filter(Boolean)
             )}
           </TabsContent>
         </Tabs>
