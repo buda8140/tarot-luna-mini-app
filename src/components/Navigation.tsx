@@ -32,24 +32,24 @@ export const Navigation = () => {
                 key={item.path}
                 to={item.path}
                 onClick={() => haptic.selection()}
-                className="relative flex flex-col items-center gap-0.5 px-2 py-1 min-w-0"
+                className="relative flex flex-col items-center justify-center gap-0.5 px-1 py-1 flex-1 min-w-0"
               >
                 {isActive && (
                   <motion.div
                     layoutId="nav-indicator"
-                    className="absolute -top-1 w-8 h-1 rounded-full bg-gradient-to-r from-primary to-accent"
+                    className="absolute -top-1 w-6 h-0.5 rounded-full bg-gradient-to-r from-primary to-accent"
                     transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
                   />
                 )}
                 <Icon
                   className={cn(
-                    'w-5 h-5 transition-colors duration-200',
+                    'w-4 h-4 transition-colors duration-200',
                     isActive ? 'text-primary' : 'text-muted-foreground'
                   )}
                 />
                 <span
                   className={cn(
-                    'text-[9px] font-medium transition-colors duration-200 truncate max-w-[50px] text-center',
+                    'text-[8px] font-medium transition-colors text-nowrap',
                     isActive ? 'text-foreground' : 'text-muted-foreground'
                   )}
                 >
