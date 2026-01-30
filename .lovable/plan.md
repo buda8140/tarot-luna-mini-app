@@ -1,69 +1,86 @@
 
-# План исправления критических проблем приложения Таро
 
-## Выявленные корневые причины
+# Полный план исправления всех проблем
 
-После детального анализа кода я обнаружил ДВЕ РАЗНЫЕ критические проблемы:
+## Найденные проблемы
 
-### Проблема 1: Пустой экран истории после расклада/оплаты
+### 1. UI - Меню не влезает в экран (ПОДТВЕРЖДЕНО)
+На скриншоте видно, что текст "История" обрезается до "Исто". Проблема:
+- 5 элементов навигации с `px-4` (16px padding с каждой стороны)
+- На узких экранах (360px) не хватает места
 
-**Корневая причина:** В `History.tsx` используется функция `safeFormatDate`, но она НЕДОСТАТОЧНА. Реальная проблема в том, что:
-
-1. В `get_history()` (database.py) используется `SELECT * FROM history`, которая возвращает колонку `timestamp`
-2. В API (`handle_history`) данные возвращаются "как есть"
-3. Но на ФРОНТЕНДЕ типы `HistoryItem` и `PaymentItem` ожидают определённую структуру
-
-**КРИТИЧЕСКАЯ НАХОДКА:** Проблема в методе `get_user_payments()` в `database.py` (строка 1663):
-```sql
-SELECT p.yoomoney_label, p.admin_id
+### 2. Backend - Оплата не зачисляется
+В `main.py` строка 580:
+```python
+success = await db.confirm_payment(payment_id=pending_id, status="confirmed")
 ```
-Колонка `admin_id` может **не существовать** в таблице payments! Это вызывает ошибку SQL и возврат пустого массива.
+Не передаётся параметр `requests`, хотя метод его принимает!
 
-### Проблема 2: Запросы не зачисляются после оплаты
-
-**Корневая причина:** Проверка платежей в `main.py` работает корректно, НО:
-
-1. Метод `confirm_payment()` НЕ получает количество `requests` из БД правильно
-2. Когда вызывается `await db.confirm_payment(payment_id=pending_id, status="confirmed")` без третьего параметра, он берёт `requests` из базы, НО поиск платежа происходит уже ПОСЛЕ обновления статуса (строка 1226)
+### 3. Backend - История возвращает пустой массив
+В `database.py` строка 1664 запрашивается колонка `p.admin_id`, которая может не существовать в старых БД (миграция могла не выполниться). Это вызывает SQL ошибку.
 
 ---
 
-## Детальный план исправлений
+## Исправления
 
-### Файл 1: `backend/database.py`
+### Файл 1: `src/components/Navigation.tsx`
 
-**Исправление 1:** Метод `get_user_payments()` - убрать несуществующие колонки
-```python
-# Строка 1655-1672
-# БЫЛО:
-SELECT p.id, p.user_id, p.amount, p.requests, p.status, p.timestamp,
-       p.yoomoney_label, p.admin_id, COALESCE(r.label, '') as tariff_name
-       
-# СТАНЕТ:
-SELECT p.id, p.user_id, p.amount, p.requests, p.status, p.timestamp,
-       p.yoomoney_label, COALESCE(r.label, '') as tariff_name
+Уменьшить padding и размер текста для мобильных устройств:
+
+```tsx
+const navItems = [
+  { path: '/', icon: Home, label: 'Главная' },
+  { path: '/reading', icon: Sparkles, label: 'Расклад' },
+  { path: '/profile', icon: User, label: 'Профиль' },
+  { path: '/shop', icon: ShoppingCart, label: 'Магазин' },
+  { path: '/history', icon: History, label: 'История' },
+];
+
+// Изменить className в NavLink:
+className="relative flex flex-col items-center gap-0.5 px-2 py-1 min-w-0"
+
+// Изменить span с текстом:
+className="text-[9px] font-medium transition-colors truncate max-w-[50px] text-center"
 ```
 
-**Исправление 2:** Добавить проверку колонки `admin_id` с graceful fallback
+**Ключевые изменения:**
+- `px-4` → `px-2` (меньше padding)
+- `gap-1` → `gap-0.5` (меньше отступ)
+- `text-[10px]` → `text-[9px]` (меньше шрифт)
+- Добавить `truncate max-w-[50px]` для обрезки текста
+- Добавить `min-w-0` для корректной работы truncate
 
-**Исправление 3:** Метод `get_history()` - добавить явную обработку NULL в timestamp
+### Файл 2: `backend/database.py` 
 
-### Файл 2: `src/pages/History.tsx`
+Исправить метод `get_user_payments()` - убрать `admin_id` или сделать его опциональным:
 
-**Исправление:** Улучшить `safeFormatDate` и добавить защиту от ошибок API:
-- Обернуть маппинг в try-catch
-- Добавить fallback при ошибке парсинга
-- Показать сообщение об ошибке вместо белого экрана
+```python
+# Строки 1655-1672 - заменить SQL запрос на безопасный:
+cursor.execute("""
+    SELECT 
+        p.id,
+        p.user_id,
+        p.amount,
+        p.requests,
+        p.status,
+        p.timestamp,
+        p.yoomoney_label,
+        COALESCE(r.label, '') as tariff_name
+    FROM payments p
+    LEFT JOIN rates r ON p.requests = r.requests 
+        AND CAST(p.amount AS REAL) = CAST(r.price AS REAL)
+    WHERE p.user_id = ?
+    ORDER BY p.timestamp DESC
+    LIMIT ? OFFSET ?
+""", (user_id, limit, offset))
+```
 
-### Файл 3: `src/lib/api.ts`
+Убираем `p.admin_id` из SELECT, так как эта колонка может не существовать.
 
-**Исправление:** Добавить более подробное логирование и обработку ошибок в `getHistory()`:
-- Логировать raw response для отладки
-- Обернуть парсинг в try-catch
+### Файл 3: `backend/main.py`
 
-### Файл 4: `backend/main.py`
+Передавать `requests` в `confirm_payment()`:
 
-**Исправление:** В функции `check_yoomoney_payments` явно передавать количество requests:
 ```python
 # Строка 580 - БЫЛО:
 success = await db.confirm_payment(payment_id=pending_id, status="confirmed")
@@ -71,110 +88,28 @@ success = await db.confirm_payment(payment_id=pending_id, status="confirmed")
 # СТАНЕТ:
 success = await db.confirm_payment(
     payment_id=pending_id, 
-    status="confirmed", 
+    status="confirmed",
     requests=pending_requests  # Явно передаём количество запросов
 )
 ```
 
 ---
 
-## Технические изменения
+## Сводка изменений
 
-### 1. `backend/database.py` - get_user_payments()
-
-Исправить SQL запрос, убрав проблемную колонку `admin_id`:
-
-```python
-async def get_user_payments(self, user_id: int, limit: int = 10, offset: int = 0):
-    try:
-        with sqlite3.connect(self.db_path) as conn:
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            # Безопасный запрос без admin_id
-            cursor.execute("""
-                SELECT 
-                    p.id,
-                    p.user_id,
-                    p.amount,
-                    p.requests,
-                    p.status,
-                    p.timestamp,
-                    p.yoomoney_label,
-                    COALESCE(r.label, '') as tariff_name
-                FROM payments p
-                LEFT JOIN rates r ON p.requests = r.requests 
-                    AND CAST(p.amount AS REAL) = CAST(r.price AS REAL)
-                WHERE p.user_id = ?
-                ORDER BY p.timestamp DESC
-                LIMIT ? OFFSET ?
-            """, (user_id, limit, offset))
-            
-            rows = cursor.fetchall()
-            return [dict(row) for row in rows]
-    except sqlite3.Error as e:
-        logger.error(f"Error getting payments: {e}")
-        return []
-```
-
-### 2. `backend/main.py` - check_yoomoney_payments()
-
-Явно передавать requests в confirm_payment:
-
-```python
-# Строка ~580
-success = await db.confirm_payment(
-    payment_id=pending_id, 
-    status="confirmed",
-    requests=pending_requests  # Критически важно!
-)
-```
-
-### 3. `src/pages/History.tsx` - Защита от ошибок
-
-Добавить try-catch вокруг рендеринга списков:
-
-```typescript
-{readings.length === 0 ? (
-  // пустое состояние
-) : (
-  readings.map((reading, index) => {
-    try {
-      return (
-        <motion.div key={reading.id}>
-          {/* ... */}
-        </motion.div>
-      );
-    } catch (err) {
-      console.error('Error rendering reading:', err, reading);
-      return null;
-    }
-  }).filter(Boolean)
-)}
-```
-
-### 4. `src/lib/api.ts` - Улучшенное логирование
-
-```typescript
-export async function getHistory(...) {
-  // ... существующий код ...
-  
-  console.log('[API] getHistory raw response:', result);
-  
-  // Валидация данных
-  const history = Array.isArray(result.data?.history) ? result.data.history : [];
-  const payments = Array.isArray(result.data?.payments) ? result.data.payments : [];
-  
-  return { history, payments, total: result.data?.pagination?.total || 0 };
-}
-```
+| Файл | Что исправляем |
+|------|----------------|
+| `src/components/Navigation.tsx` | Меню влезает в экран на мобильных устройствах |
+| `backend/database.py` | Убираем admin_id из get_user_payments() |
+| `backend/main.py` | Передаём requests в confirm_payment() |
 
 ---
 
 ## Деплой на VPS
 
+После коммита изменений:
+
 ```bash
-# Одна команда для обновления
 cd /root/tarot-luna && git pull origin main && npm run build && pm2 restart tarot-backend && systemctl restart nginx
 ```
 
@@ -182,36 +117,7 @@ cd /root/tarot-luna && git pull origin main && npm run build && pm2 restart taro
 
 ## Проверка после деплоя
 
-1. **Логи базы данных:**
-```bash
-tail -50 backend/logs/bot.log | grep -E "(Error|payment|history)"
-```
+1. **UI:** Открыть приложение на телефоне - все 5 пунктов меню должны быть видны
+2. **История:** Сделать расклад → перейти в Историю → данные должны отобразиться
+3. **Оплата:** Купить тариф за 2₽ → оплатить → баланс должен обновиться автоматически
 
-2. **Логи YooMoney:**
-```bash
-tail -50 backend/logs/yoomoney.log
-```
-
-3. **Проверка структуры таблицы payments:**
-```bash
-cd backend && sqlite3 database.db ".schema payments"
-```
-
----
-
-## Тестовый сценарий
-
-1. Сделать расклад → сразу перейти в Историю → должны появиться данные без белого экрана
-2. Купить тестовый тариф (2 руб.) → оплатить → проверить логи → баланс должен обновиться
-3. Toast-уведомление должно появиться при зачислении
-
----
-
-## Изменяемые файлы
-
-| Файл | Что исправляем |
-|------|----------------|
-| `backend/database.py` | Убираем admin_id из get_user_payments() |
-| `backend/main.py` | Передаём requests в confirm_payment() |
-| `src/pages/History.tsx` | Защита от ошибок рендеринга |
-| `src/lib/api.ts` | Улучшенная валидация и логирование |
