@@ -22,7 +22,7 @@ export const Navigation = () => {
       className="fixed bottom-0 left-0 right-0 z-50 pb-safe"
     >
       <div className="mx-4 mb-4">
-        <div className="flex items-center justify-around px-2 py-3 rounded-2xl bg-card/80 backdrop-blur-lg border border-border/50 shadow-lg">
+        <div className="flex items-center justify-between px-3 py-2.5 rounded-2xl bg-card/80 backdrop-blur-lg border border-border/50 shadow-lg gap-0">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
