@@ -1,0 +1,8 @@
+2025-12-29 17:58:41 - root - INFO - 🔮 Logging setup completed
+2025-12-29 17:58:41 - root - INFO - ✅ Production mode: INFO logs, minimal spam, webhook disabled by default
+2025-12-29 17:58:41 - database - INFO - 🔮 Database initialized successfully with achievements support
+2025-12-29 17:58:41 - __main__ - INFO - 🔮 Database initialized
+2025-12-29 17:58:41 - __main__ - INFO - ⏰ Scheduler started with YooMoney payment checking
+2025-12-29 17:58:41 - __main__ - INFO - 🔮 Starting bot...
+2025-12-29 17:58:41 - aiogram.dispatcher - INFO - Start polling
+2025-12-29 17:59:01 - aiogram.dispatcher - INFO - Run polling for bot @budaio_bot id=7599832705 - 'тест буда'
