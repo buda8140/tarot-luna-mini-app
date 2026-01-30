@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode, useRef } from 'react';
 import { authUser, getApiUser, UserData, UserStats, checkApiHealth, getApiUrl } from '@/lib/api';
 import { getUser as getTelegramUser, getTelegramWebApp } from '@/lib/telegram';
+import { toast } from '@/hooks/use-toast';
 
 // Check if running inside Telegram
 const checkIsInTelegram = (): boolean => {
@@ -45,6 +46,9 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const [agreedRules, setAgreedRulesState] = useState(() => {
     return localStorage.getItem('tarot_agreed_rules') === 'true';
   });
+  
+  // Ref для отслеживания предыдущего баланса (для toast уведомлений)
+  const prevPremiumRequestsRef = useRef<number | null>(null);
 
   // Загрузка данных пользователя
   const refreshUser = useCallback(async () => {
@@ -84,6 +88,22 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       if (result.error) {
         setError(result.error);
       } else if (result.user) {
+        // Проверяем, увеличился ли баланс premium_requests (платёж зачислен)
+        if (prevPremiumRequestsRef.current !== null && 
+            result.user.premium_requests > prevPremiumRequestsRef.current) {
+          const added = result.user.premium_requests - prevPremiumRequestsRef.current;
+          console.log(`[UserContext] 🎉 Payment confirmed! +${added} premium requests`);
+          
+          // Показываем красивое уведомление
+          toast({
+            title: "🎉 Оплата прошла успешно!",
+            description: `Начислено +${added} ${added === 1 ? 'запрос' : added < 5 ? 'запроса' : 'запросов'}`,
+          });
+        }
+        
+        // Обновляем ref для следующего сравнения
+        prevPremiumRequestsRef.current = result.user.premium_requests;
+        
         setUser(result.user);
         setStats(result.stats);
         

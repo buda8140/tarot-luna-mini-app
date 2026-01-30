@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Calendar, CreditCard, ChevronRight, Sparkles, Loader2, CheckCircle, Clock, XCircle, Eye, Moon } from 'lucide-react';
+import { ArrowLeft, Calendar, CreditCard, ChevronRight, Sparkles, Loader2, CheckCircle, Clock, XCircle, Eye, Moon, RefreshCw } from 'lucide-react';
 import { PageTransition } from '@/components/PageTransition';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,6 +9,21 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { getHistory, HistoryItem, PaymentItem } from '@/lib/api';
+
+/**
+ * Безопасное форматирование даты с защитой от Invalid Date.
+ * При ошибке возвращает fallback строку.
+ */
+const safeFormatDate = (dateStr: string | undefined | null, formatStr: string, fallback: string = 'Дата неизвестна'): string => {
+  if (!dateStr) return fallback;
+  try {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return fallback;
+    return format(date, formatStr, { locale: ru });
+  } catch {
+    return fallback;
+  }
+};
 
 const History = () => {
   const navigate = useNavigate();
@@ -182,7 +197,7 @@ const History = () => {
                           <p className="text-xs text-muted-foreground truncate">{reading.question}</p>
                           <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground">
                             <Calendar className="w-2.5 h-2.5" />
-                            {format(new Date(reading.timestamp || reading.created_at || new Date()), 'd MMM, HH:mm', { locale: ru })}
+                            {safeFormatDate(reading.timestamp || reading.created_at, 'd MMM, HH:mm')}
                           </div>
                         </div>
                       </div>
@@ -195,6 +210,17 @@ const History = () => {
           </TabsContent>
 
           <TabsContent value="payments" className="mt-3 space-y-2">
+            {/* Кнопка обновления для платежей */}
+            <div className="flex justify-end mb-2">
+              <button 
+                onClick={loadHistory} 
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-primary/20 hover:bg-primary/30 text-primary rounded-lg transition-colors"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Обновить
+              </button>
+            </div>
+            
             {payments.length === 0 ? (
               <div className="mystic-card p-6 text-center">
                 <CreditCard className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
@@ -220,7 +246,7 @@ const History = () => {
                         <span>•</span>
                         <span>{getStatusText(payment.status)}</span>
                         <span>•</span>
-                        <span>{format(new Date(payment.timestamp), 'd MMM', { locale: ru })}</span>
+                        <span>{safeFormatDate(payment.timestamp, 'd MMM')}</span>
                       </div>
                     </div>
                   </div>
@@ -245,7 +271,7 @@ const History = () => {
                 {/* Дата */}
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   <Calendar className="w-3 h-3" />
-                  {format(new Date(selectedReading.timestamp || selectedReading.created_at || new Date()), 'd MMMM yyyy, HH:mm', { locale: ru })}
+                  {safeFormatDate(selectedReading.timestamp || selectedReading.created_at, 'd MMMM yyyy, HH:mm')}
                 </div>
 
                 {/* Вопрос */}
